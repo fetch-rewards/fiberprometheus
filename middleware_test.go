@@ -353,15 +353,15 @@ func TestMiddlewareWithConfig(t *testing.T) {
 		return c.SendString("test")
 
 	})
-	//app.Get("/", func(c *fiber.Ctx) error {
-	//	return c.SendString("Hello World")
-	//})
-	//
-	//req := httptest.NewRequest("GET", "/", nil)
-	//resp, _ := app.Test(req, -1)
-	//if resp.StatusCode != 200 {
-	//	t.Fail()
-	//}
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("Hello World")
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	resp, _ := app.Test(req, -1)
+	if resp.StatusCode != 200 {
+		t.Fail()
+	}
 	req := httptest.NewRequest("GET", "/fullpath/meh", nil)
 	resp, _ := app.Test(req, -1)
 	if resp.StatusCode != 200 {
