@@ -344,17 +344,23 @@ func TestMiddlewareWithConfig(t *testing.T) {
 		serviceName: "unique-my_service_with_name",
 		namespace:   "my_service_with_name",
 		subsystem:   "http",
+		skipPaths: []string{
+			"/skip/",
+		},
 	}
 	prometheus := NewFromConfig(config)
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-
+	//app.Get("/", func(c *fiber.Ctx) error {
+	//	return c.SendString("Hello World")
+	//})
 	app.Get("/fullpath/*", func(c *fiber.Ctx) error {
 		return c.SendString("test")
 
 	})
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello World")
+	app.Get("/skip/", func(c *fiber.Ctx) error {
+		return c.SendString("test")
+
 	})
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -362,8 +368,13 @@ func TestMiddlewareWithConfig(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fail()
 	}
-	req := httptest.NewRequest("GET", "/fullpath/meh", nil)
-	resp, _ := app.Test(req, -1)
+	req = httptest.NewRequest("GET", "/fullpath/meh", nil)
+	resp, _ = app.Test(req, -1)
+	if resp.StatusCode != 200 {
+		t.Fail()
+	}
+	req = httptest.NewRequest("GET", "/skip/", nil)
+	resp, _ = app.Test(req, -1)
 	if resp.StatusCode != 200 {
 		t.Fail()
 	}
@@ -392,8 +403,9 @@ func TestMiddlewareWithConfig(t *testing.T) {
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
-	want = `my_service_with_name_http_request_duration_seconds_count{method="GET",path="/metricsh//meh",service="unique-my_service_with_name",status_code="200"} 1`
+	want = `my_service_with_name_http_request_duration_seconds_count{method="GET",path="/metricsh/meh",service="unique-my_service_with_name",status_code="200"} 1`
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
+
 }

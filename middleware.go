@@ -22,6 +22,7 @@
 package fiberprometheus
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -223,12 +224,21 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 		status = ctx.Response().StatusCode()
 	}
 
+	for _, b := range ps.skipPaths {
+		if ctx.Route().Path == b {
+			log.Printf("skipping %s", b)
+			return ctx.Next()
+		}
+		log.Println(ctx.Route().Path)
+	}
+
 	var path string
 	if ps.fullPaths {
 		path = ctx.Path()
 	} else {
 		path = ctx.Route().Path
 	}
+
 	statusCode := strconv.Itoa(status)
 	ps.requestsTotal.WithLabelValues(statusCode, method, path).Inc()
 
