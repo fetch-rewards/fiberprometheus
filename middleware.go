@@ -38,9 +38,33 @@ type FiberPrometheus struct {
 	requestDuration *prometheus.HistogramVec
 	requestInFlight *prometheus.GaugeVec
 	defaultURL      string
+	skipPaths       []string
+	fullPaths       bool
 }
 
-func create(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string) *FiberPrometheus {
+type Config struct {
+	registry    prometheus.Registerer
+	serviceName string
+	namespace   string
+	subsystem   string
+	labels      map[string]string
+	skipPaths   []string
+	fullPaths   bool
+}
+
+func (c *Config) fillDefaults() {
+	if c.serviceName == "" {
+		c.serviceName = "my-service"
+	}
+	if c.registry == nil {
+		c.registry = prometheus.DefaultRegisterer
+	}
+	if c.namespace == "" {
+		c.namespace = "http"
+	}
+}
+
+func create(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string, skipPaths []string, fullPaths bool) *FiberPrometheus {
 	constLabels := make(prometheus.Labels)
 	if serviceName != "" {
 		constLabels["service"] = serviceName
@@ -112,13 +136,20 @@ func create(registry prometheus.Registerer, serviceName, namespace, subsystem st
 		requestDuration: histogram,
 		requestInFlight: gauge,
 		defaultURL:      "/metrics",
+		skipPaths:       skipPaths,
+		fullPaths:       fullPaths,
 	}
 }
 
 // New creates a new instance of FiberPrometheus middleware
 // serviceName is available as a const label
 func New(serviceName string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, serviceName, "http", "", nil)
+	return create(prometheus.DefaultRegisterer, serviceName, "http", "", nil, nil, false)
+}
+
+func NewFromConfig(config Config) *FiberPrometheus {
+	config.fillDefaults()
+	return create(config.registry, config.serviceName, config.namespace, config.subsystem, config.labels, config.skipPaths, config.fullPaths)
 }
 
 // NewWith creates a new instance of FiberPrometheus middleware but with an ability
@@ -129,7 +160,7 @@ func New(serviceName string) *FiberPrometheus {
 // For e.g. namespace = "my_app", subsystem = "http" then metrics would be
 // `my_app_http_requests_total{...,service= "serviceName"}`
 func NewWith(serviceName, namespace, subsystem string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, serviceName, namespace, subsystem, nil)
+	return create(prometheus.DefaultRegisterer, serviceName, namespace, subsystem, nil, nil, false)
 }
 
 // NewWithLabels creates a new instance of FiberPrometheus middleware but with an ability
@@ -141,7 +172,7 @@ func NewWith(serviceName, namespace, subsystem string) *FiberPrometheus {
 // then then metrics would become
 // `my_app_http_requests_total{...,key1= "value1", key2= "value2" }`
 func NewWithLabels(labels map[string]string, namespace, subsystem string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, "", namespace, subsystem, labels)
+	return create(prometheus.DefaultRegisterer, "", namespace, subsystem, labels, nil, false)
 }
 
 // NewWithRegistry creates a new instance of FiberPrometheus middleware but with an ability
@@ -153,7 +184,7 @@ func NewWithLabels(labels map[string]string, namespace, subsystem string) *Fiber
 // then then metrics would become
 // `my_app_http_requests_total{...,key1= "value1", key2= "value2" }`
 func NewWithRegistry(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string) *FiberPrometheus {
-	return create(registry, serviceName, namespace, subsystem, labels)
+	return create(registry, serviceName, namespace, subsystem, labels, nil, false)
 }
 
 // RegisterAt will register the prometheus handler at a given URL
@@ -192,8 +223,12 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 		status = ctx.Response().StatusCode()
 	}
 
-	path := ctx.Route().Path
-
+	var path string
+	if ps.fullPaths {
+		path = ctx.Path()
+	} else {
+		path = ctx.Route().Path
+	}
 	statusCode := strconv.Itoa(status)
 	ps.requestsTotal.WithLabelValues(statusCode, method, path).Inc()
 
