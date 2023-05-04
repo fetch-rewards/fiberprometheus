@@ -22,7 +22,6 @@
 package fiberprometheus
 
 import (
-	"log"
 	"strconv"
 	"time"
 
@@ -226,10 +225,8 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 
 	for _, b := range ps.skipPaths {
 		if ctx.Route().Path == b {
-			log.Printf("skipping %s", b)
 			return ctx.Next()
 		}
-		log.Println(ctx.Route().Path)
 	}
 
 	var path string
