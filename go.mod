@@ -1,4 +1,4 @@
-module github.com/fetchrewards/fiberprometheus/v2
+module github.com/fetch-rewards/fiberprometheus/v2
 
 go 1.16
 
