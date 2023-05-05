@@ -340,11 +340,11 @@ func TestMiddlewareWithConfig(t *testing.T) {
 	app := fiber.New()
 
 	config := Config{
-		fullPaths:   true,
-		serviceName: "unique-my_service_with_name",
-		namespace:   "my_service_with_name",
-		subsystem:   "http",
-		skipPaths: []string{
+		FullPaths:   true,
+		ServiceName: "unique-my_service_with_name",
+		Namespace:   "my_service_with_name",
+		Subsystem:   "http",
+		SkipPaths: []string{
 			"/skip/",
 		},
 	}
