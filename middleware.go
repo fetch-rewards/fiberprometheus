@@ -22,6 +22,7 @@
 package fiberprometheus
 
 import (
+	"github.com/gofiber/fiber/v2/utils"
 	"strconv"
 	"time"
 
@@ -231,9 +232,9 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 
 	var path string
 	if ps.fullPaths {
-		path = ctx.Path()
+		path = utils.CopyString(ctx.Path())
 	} else {
-		path = ctx.Route().Path
+		path = utils.CopyString(ctx.Route().Path)
 	}
 
 	statusCode := strconv.Itoa(status)
