@@ -22,6 +22,7 @@
 package fiberprometheus
 
 import (
+	"github.com/gofiber/fiber/v2/utils"
 	"strconv"
 	"time"
 
@@ -43,24 +44,24 @@ type FiberPrometheus struct {
 }
 
 type Config struct {
-	registry    prometheus.Registerer
-	serviceName string
-	namespace   string
-	subsystem   string
-	labels      map[string]string
-	skipPaths   []string
-	fullPaths   bool
+	Registry    prometheus.Registerer
+	ServiceName string
+	Namespace   string
+	Subsystem   string
+	Labels      map[string]string
+	SkipPaths   []string
+	FullPaths   bool
 }
 
 func (c *Config) fillDefaults() {
-	if c.serviceName == "" {
-		c.serviceName = "my-service"
+	if c.ServiceName == "" {
+		c.ServiceName = "my-service"
 	}
-	if c.registry == nil {
-		c.registry = prometheus.DefaultRegisterer
+	if c.Registry == nil {
+		c.Registry = prometheus.DefaultRegisterer
 	}
-	if c.namespace == "" {
-		c.namespace = "http"
+	if c.Namespace == "" {
+		c.Namespace = "http"
 	}
 }
 
@@ -149,7 +150,7 @@ func New(serviceName string) *FiberPrometheus {
 
 func NewFromConfig(config Config) *FiberPrometheus {
 	config.fillDefaults()
-	return create(config.registry, config.serviceName, config.namespace, config.subsystem, config.labels, config.skipPaths, config.fullPaths)
+	return create(config.Registry, config.ServiceName, config.Namespace, config.Subsystem, config.Labels, config.SkipPaths, config.FullPaths)
 }
 
 // NewWith creates a new instance of FiberPrometheus middleware but with an ability
@@ -231,9 +232,9 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 
 	var path string
 	if ps.fullPaths {
-		path = ctx.Path()
+		path = utils.CopyString(ctx.Path())
 	} else {
-		path = ctx.Route().Path
+		path = utils.CopyString(ctx.Route().Path)
 	}
 
 	statusCode := strconv.Itoa(status)
