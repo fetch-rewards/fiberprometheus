@@ -226,7 +226,7 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 
 	for _, b := range ps.skipPaths {
 		if ctx.Route().Path == b {
-			return ctx.Next()
+			return err
 		}
 	}
 
