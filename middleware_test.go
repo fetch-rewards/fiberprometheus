@@ -342,12 +342,13 @@ func TestMiddlewareWithConfig(t *testing.T) {
 
 	config := Config{
 		FullPaths:   true,
-		ServiceName: "unique-my_service_with_name",
+		ServiceName: "unique-service",
 		Namespace:   "my_service_with_name",
 		Subsystem:   "http",
 		SkipPaths: []string{
 			"/skip",
 		},
+		ClientHeader: "test-header",
 	}
 	prometheus := NewFromConfig(config)
 	prometheus.RegisterAt(app, "/metrics")
@@ -364,26 +365,22 @@ func TestMiddlewareWithConfig(t *testing.T) {
 		return c.SendString("Hello World")
 	})
 	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("test-header", "test")
 	resp, _ := app.Test(req, -1)
 	if resp.StatusCode != 200 {
 		log.Println(1)
 		t.Fail()
 	}
 	req = httptest.NewRequest("GET", "/fullpath/meh", nil)
+	req.Header.Set("test-header", "test")
 	resp, _ = app.Test(req, -1)
 	if resp.StatusCode != 200 {
 		log.Println(2)
 		t.Fail()
 	}
-	req = httptest.NewRequest("GET", "/skip", nil)
-	resp, _ = app.Test(req, -1)
-
-	if resp.StatusCode != 200 {
-		log.Println(3)
-		t.Fail()
-	}
 
 	req = httptest.NewRequest("GET", "/metrics", nil)
+	req.Header.Set("test-header", "test")
 	resp, _ = app.Test(req, -1)
 	if resp.StatusCode != 200 {
 		log.Println(4)
@@ -394,12 +391,12 @@ func TestMiddlewareWithConfig(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 	//assert.EqualValues(t, got, "")
-	want := `my_service_with_name_http_requests_total{method="GET",path="/",service="unique-service",status_code="200"} `
+	want := `my_service_with_name_http_requests_total{client="test",method="GET",path="/",service="unique-service",status_code="200"} `
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
 
-	want = `my_service_with_name_http_request_duration_seconds_count{method="GET",path="/",service="unique-service",status_code="200"} 1`
+	want = `my_service_with_name_http_request_duration_seconds_count{client="test",method="GET",path="/",service="unique-service",status_code="200"} 1`
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
@@ -408,11 +405,11 @@ func TestMiddlewareWithConfig(t *testing.T) {
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
-	want = `my_service_with_name_http_request_duration_seconds_count{method="GET",path="/fullpath/meh",service="unique-my_service_with_name",status_code="200"} 1`
+	want = `my_service_with_name_http_request_duration_seconds_count{client="test",method="GET",path="/fullpath/meh",service="unique-service",status_code="200"} 1`
 	if !strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
-	want = `my_service_with_name_http_request_duration_seconds_count{method="GET",path="/skip",service="unique-my_service_with_name",status_code="200"} 1`
+	want = `my_service_with_name_http_request_duration_seconds_count{client="test",method="GET",path="/skip",service="unique-service",status_code="200"} 1`
 	if strings.Contains(got, want) {
 		t.Errorf("got %s; want %s", got, want)
 	}
