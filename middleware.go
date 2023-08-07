@@ -35,22 +35,25 @@ import (
 
 // FiberPrometheus ...
 type FiberPrometheus struct {
-	requestsTotal   *prometheus.CounterVec
-	requestDuration *prometheus.HistogramVec
-	requestInFlight *prometheus.GaugeVec
-	defaultURL      string
-	skipPaths       []string
-	fullPaths       bool
+	requestsTotal         *prometheus.CounterVec
+	requestsTotalByClient *prometheus.CounterVec
+	requestDuration       *prometheus.HistogramVec
+	requestInFlight       *prometheus.GaugeVec
+	defaultURL            string
+	skipPaths             []string
+	fullPaths             bool
+	clientHeader          string
 }
 
 type Config struct {
-	Registry    prometheus.Registerer
-	ServiceName string
-	Namespace   string
-	Subsystem   string
-	Labels      map[string]string
-	SkipPaths   []string
-	FullPaths   bool
+	Registry     prometheus.Registerer
+	ServiceName  string
+	Namespace    string
+	Subsystem    string
+	Labels       map[string]string
+	SkipPaths    []string
+	FullPaths    bool
+	ClientHeader string
 }
 
 func (c *Config) fillDefaults() {
@@ -63,13 +66,19 @@ func (c *Config) fillDefaults() {
 	if c.Namespace == "" {
 		c.Namespace = "http"
 	}
+	if c.ClientHeader == "" {
+		c.ClientHeader = "application-requesting-user"
+	}
 }
 
-func create(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string, skipPaths []string, fullPaths bool) *FiberPrometheus {
+func create(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string, skipPaths []string, fullPaths bool, clientHeader string) *FiberPrometheus {
 	constLabels := make(prometheus.Labels)
 	if serviceName != "" {
 		constLabels["service"] = serviceName
 	}
+	//if clientHeader != "" {
+	//	constLabels["client"] = clientHeader
+	//}
 	for label, value := range labels {
 		constLabels[label] = value
 	}
@@ -80,7 +89,7 @@ func create(registry prometheus.Registerer, serviceName, namespace, subsystem st
 			Help:        "Count all http requests by status code, method and path.",
 			ConstLabels: constLabels,
 		},
-		[]string{"status_code", "method", "path"},
+		[]string{"status_code", "method", "path", "client"},
 	)
 	histogram := promauto.With(registry).NewHistogramVec(prometheus.HistogramOpts{
 		Name:        prometheus.BuildFQName(namespace, subsystem, "request_duration_seconds"),
@@ -123,7 +132,7 @@ func create(registry prometheus.Registerer, serviceName, namespace, subsystem st
 			30.0,
 		},
 	},
-		[]string{"status_code", "method", "path"},
+		[]string{"status_code", "method", "path", "client"},
 	)
 
 	gauge := promauto.With(registry).NewGaugeVec(prometheus.GaugeOpts{
@@ -139,18 +148,19 @@ func create(registry prometheus.Registerer, serviceName, namespace, subsystem st
 		defaultURL:      "/metrics",
 		skipPaths:       skipPaths,
 		fullPaths:       fullPaths,
+		clientHeader:    clientHeader,
 	}
 }
 
 // New creates a new instance of FiberPrometheus middleware
 // serviceName is available as a const label
 func New(serviceName string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, serviceName, "http", "", nil, nil, false)
+	return create(prometheus.DefaultRegisterer, serviceName, "http", "", nil, nil, false, "")
 }
 
 func NewFromConfig(config Config) *FiberPrometheus {
 	config.fillDefaults()
-	return create(config.Registry, config.ServiceName, config.Namespace, config.Subsystem, config.Labels, config.SkipPaths, config.FullPaths)
+	return create(config.Registry, config.ServiceName, config.Namespace, config.Subsystem, config.Labels, config.SkipPaths, config.FullPaths, config.ClientHeader)
 }
 
 // NewWith creates a new instance of FiberPrometheus middleware but with an ability
@@ -161,7 +171,7 @@ func NewFromConfig(config Config) *FiberPrometheus {
 // For e.g. namespace = "my_app", subsystem = "http" then metrics would be
 // `my_app_http_requests_total{...,service= "serviceName"}`
 func NewWith(serviceName, namespace, subsystem string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, serviceName, namespace, subsystem, nil, nil, false)
+	return create(prometheus.DefaultRegisterer, serviceName, namespace, subsystem, nil, nil, false, "")
 }
 
 // NewWithLabels creates a new instance of FiberPrometheus middleware but with an ability
@@ -173,7 +183,7 @@ func NewWith(serviceName, namespace, subsystem string) *FiberPrometheus {
 // then then metrics would become
 // `my_app_http_requests_total{...,key1= "value1", key2= "value2" }`
 func NewWithLabels(labels map[string]string, namespace, subsystem string) *FiberPrometheus {
-	return create(prometheus.DefaultRegisterer, "", namespace, subsystem, labels, nil, false)
+	return create(prometheus.DefaultRegisterer, "", namespace, subsystem, labels, nil, false, "")
 }
 
 // NewWithRegistry creates a new instance of FiberPrometheus middleware but with an ability
@@ -185,7 +195,7 @@ func NewWithLabels(labels map[string]string, namespace, subsystem string) *Fiber
 // then then metrics would become
 // `my_app_http_requests_total{...,key1= "value1", key2= "value2" }`
 func NewWithRegistry(registry prometheus.Registerer, serviceName, namespace, subsystem string, labels map[string]string) *FiberPrometheus {
-	return create(registry, serviceName, namespace, subsystem, labels, nil, false)
+	return create(registry, serviceName, namespace, subsystem, labels, nil, false, "")
 }
 
 // RegisterAt will register the prometheus handler at a given URL
@@ -237,11 +247,13 @@ func (ps *FiberPrometheus) Middleware(ctx *fiber.Ctx) error {
 		path = utils.CopyString(ctx.Route().Path)
 	}
 
+	client := utils.CopyString(ctx.Get(ps.clientHeader))
+
 	statusCode := strconv.Itoa(status)
-	ps.requestsTotal.WithLabelValues(statusCode, method, path).Inc()
+	ps.requestsTotal.WithLabelValues(statusCode, method, path, client).Inc()
 
 	elapsed := float64(time.Since(start).Nanoseconds()) / 1e9
-	ps.requestDuration.WithLabelValues(statusCode, method, path).Observe(elapsed)
+	ps.requestDuration.WithLabelValues(statusCode, method, path, client).Observe(elapsed)
 
 	return err
 }
